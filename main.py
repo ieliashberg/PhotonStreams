@@ -1,22 +1,12 @@
-# This is a sample Python script.
+import numpy as np
 
-# Press ⌃R to execute it or replace it with your code.
-# Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
-
-
-# NAIVE IMPLEMENTATION
-# take the delayed array and subtract from it 950 to 1050
-# figure out where there is the most correlation, and what the value of the correlation is
-# have an array of size 1000 that holds the current samples (and potentially
-#    one computed ahead array so you aren't behind by more than 1000 samples (or whatever the step size is)
-# Assuming you now have 2 arrays, compute correlation function
 
 def load_in_streams():
     with open('delayed_input.txt', 'r') as f:
-        dStream = int(''.join(line.strip() for line in f))
+        dStream = int(''.join(line.strip() for line in f), 2)  # convert to binary representation from the file
 
     with open('regular_input.txt', 'r') as f:
-        rStream = int(''.join(line.strip() for line in f))
+        rStream = int(''.join(line.strip() for line in f), 2)
 
     return dStream, rStream
 
@@ -24,7 +14,24 @@ def load_in_streams():
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     delayedStream, regularStream = load_in_streams()
+    bestCoincidingCount = 0
+    bestDelay = 950
     for i in range(950, 1051):
-        tempDelayedStream = delayedStream % (10 ** (100000 - i))     # get the shifted delayedStream by cutting of the first i
-        tempRegularStream = delayedStream // (10 ** i)    # get the shifted regularStream by cutting off the last i
+        tempDelayedStream = delayedStream << i  # get the shifted delayedStream by cutting of the first i
+        tempRegularStream = delayedStream >> i  # get the shifted regularStream by cutting off the last i
+        coincidingNum = tempDelayedStream & tempRegularStream  # and the two streams
+        coincidingCount = bin(coincidingNum).count('1')  # count the number of coinciding 1s
+        if bestCoincidingCount < coincidingCount:  # update bestDelay and bestCoincidingCount if necessary
+            bestCoincidingCount = coincidingCount
+            bestDelay = i
 
+    surroundingArr = np.zeros(10, int)  # look at surrounding values (+-5)
+    for i in range(-5, 6):
+        if i == 0:  # if it isn't surrounding (just og val) don't include it
+            continue
+        tempDelayedStream = delayedStream << (i + bestDelay)
+        tempRegularStream = delayedStream >> (i + bestDelay)
+        coincidingNum = tempDelayedStream & tempRegularStream
+        coincidingCount = bin(coincidingNum).count('1')
+
+        surroundingArr[5 + i] = coincidingCount  # add to surroundArr
