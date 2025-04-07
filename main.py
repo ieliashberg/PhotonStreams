@@ -4,21 +4,27 @@
 # Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
 
 
-# Ideas for Naive Python Implementation
-# have a step size (variable from 1 to 1000)
+# NAIVE IMPLEMENTATION
+# take the delayed array and subtract from it 950 to 1050
+# figure out where there is the most correlation, and what the value of the correlation is
 # have an array of size 1000 that holds the current samples (and potentially
 #    one computed ahead array so you aren't behind by more than 1000 samples (or whatever the step size is)
 # Assuming you now have 2 arrays, compute correlation function
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press ⌘F8 to toggle the breakpoint.
+def load_in_streams():
+    with open('delayed_input.txt', 'r') as f:
+        dStream = int(''.join(line.strip() for line in f))
 
+    with open('regular_input.txt', 'r') as f:
+        rStream = int(''.join(line.strip() for line in f))
 
+    return dStream, rStream
 
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    print_hi('PyCharm')
+    delayedStream, regularStream = load_in_streams()
+    for i in range(950, 1051):
+        tempDelayedStream = delayedStream % (10 ** (100000 - i))     # get the shifted delayedStream by cutting of the first i
+        tempRegularStream = delayedStream // (10 ** i)    # get the shifted regularStream by cutting off the last i
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
