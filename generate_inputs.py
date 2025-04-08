@@ -29,17 +29,18 @@ def generate_delayed_stream():
             # random walk - update current delay with small step
             step = random.uniform(-0.1, 0.1)
             currentDelay += step
+            updateDelay = currentDelay
             # occasionally, add an infrequent big jump
             if random.random() < bigJumpProb:
                 bigJump = random.uniform(-bigJumpSize, bigJumpSize)
-                currentDelay += bigJump
+                updateDelay += bigJump
 
             # add fixed jitter
             jitter = 0
             if random.random() < shiftProb:
                 jitter = random.uniform(-maxJitter, maxJitter)
 
-            roundedFinalDelay = int(round(currentDelay + jitter))
+            roundedFinalDelay = int(round(updateDelay + jitter))
             roundedFinalDelay = max(expectedDelay - maxDelayVariation,
                                     roundedFinalDelay)  # make sure delay is in bounds of the max delay
             roundedFinalDelay = min(expectedDelay + maxDelayVariation, roundedFinalDelay)
@@ -64,13 +65,13 @@ def generate_delayed_stream():
 
 delayedArr, delayHistory = generate_delayed_stream()
 
-plt.figure(figsize=(12, 6))
-plt.plot(delayHistory, label="Delayed")
-plt.xlabel("Sample Index")
-plt.ylabel("Delay Value")
-plt.title("Delay Evolution Over Samples")
-plt.legend()
-plt.show()
+# plt.figure(figsize=(12, 6))
+# plt.plot(delayHistory, label="Delayed")
+# plt.xlabel("Sample Index")
+# plt.ylabel("Delay Value")
+# plt.title("Delay Evolution Over Samples")
+# plt.legend()
+# plt.show()
 
 with open('regular_input.txt', 'w') as f:  # write to the regular_input.txt file
     for val in regularArr:

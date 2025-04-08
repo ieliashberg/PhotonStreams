@@ -1,6 +1,9 @@
 import numpy as np
 import generate_inputs
+import matplotlib
 
+matplotlib.use("TkAgg")
+import matplotlib.pyplot as plt
 
 def load_in_streams():
     with open('delayed_input.txt', 'r') as f:
@@ -17,42 +20,57 @@ def load_stream(filename):
         return int(''.join(line.strip() for line in f), 2)
 
 
-# Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     generate_inputs
     # Load both streams as integers with fixed length
-    delayedStream = load_stream('delayed_input.txt')
-    regularStream = load_stream('regular_input.txt')
+    dStream = load_stream('delayed_input.txt')
+    rStream = load_stream('regular_input.txt')
 
-    bestCoincidingCount = 0
-    bestDelay = 950
 
-    for i in range(950, 1051):
-        tempRegularStream = regularStream >> i
 
-        coincidingNum = delayedStream & tempRegularStream # and the two streams
-        coincidingCount = coincidingNum.bit_count()  # count the number of coinciding 1s
+    @profile
+    def findCoinciding(delayedStream, regularStream):
+        bestCoincidingCount = 0
+        bestDelay = 950
+        # recordedCoinciding = []
+        for i in range(950, 1051):
+            tempRegularStream = regularStream >> i
 
-        if bestCoincidingCount < coincidingCount:  # update bestDelay and bestCoincidingCount if necessary
-            bestCoincidingCount = coincidingCount
-            bestDelay = i
+            coincidingNum = delayedStream & tempRegularStream # and the two streams
+            coincidingCount = coincidingNum.bit_count()  # count the number of coinciding 1s
+            # recordedCoinciding.append(coincidingCount)
 
-    surroundingArr = np.zeros(10, int)  # look at surrounding values (+-5)
-    decreaseBy1 = False
-    for offset in range(-5, 5):
-        if offset == 0:  # if it isn't surrounding (just og val) don't include it
-            decreaseBy1 = True
-            continue
+            if bestCoincidingCount < coincidingCount:  # update bestDelay and bestCoincidingCount if necessary
+                bestCoincidingCount = coincidingCount
+                bestDelay = i
 
-        currDelay = offset + bestDelay
-        tempRegularStream = regularStream >> currDelay
-        coincidingNum = delayedStream & tempRegularStream
-        coincidingCount = bin(coincidingNum).count('1')
+        # plt.figure(figsize=(12, 6))
+        # plt.plot(recordedCoinciding, label="CoincidingVals")
+        # plt.xlabel("Offset from 950")
+        # plt.ylabel("Num Coinciding")
+        # plt.title("Num Coinciding Over the Offset from 950 to 1050")
+        # plt.legend()
+        # plt.show()
 
-        if decreaseBy1:
-            offset -= 1
-        surroundingArr[5 + offset] = coincidingCount
+        surroundingArr = np.zeros(10, int)  # look at surrounding values (+-5)
+        decreaseBy1 = False
+        for offset in range(-5, 6):
+            if offset == 0:  # if it isn't surrounding (just og val) don't include it
+                decreaseBy1 = True
+                continue
 
-    print(bestDelay)
-    print(bestCoincidingCount)
-    print(surroundingArr)
+            currDelay = offset + bestDelay
+            tempRegularStream = regularStream >> currDelay
+            coincidingNum = delayedStream & tempRegularStream
+            coincidingCount = coincidingNum.bit_count()
+
+            if decreaseBy1:
+                offset -= 1
+            surroundingArr[5 + offset] = coincidingCount
+        return bestDelay, bestCoincidingCount, surroundingArr
+
+
+    optimalDelay, optimalCoinciding, surrounding = findCoinciding(dStream, rStream)
+    print(optimalDelay)
+    print(optimalCoinciding)
+    print(surrounding)
