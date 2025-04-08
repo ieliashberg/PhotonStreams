@@ -1,42 +1,76 @@
 import numpy as np
 import random
+import matplotlib
+
+matplotlib.use("TkAgg")
+import matplotlib.pyplot as plt
 
 # params
-maxDelayValChange = 10  # represents the max delay change from 1 photon to the next
 noise0to1 = 0.01  # chance 0 becoming 1
 noise1to0 = 0.1  # chance 1 becoming 0
-maxShift = 2  # how far a 1 can shift when adding noise
+maxJitter = 2  # how far a 1 can shift when adding noise
 shiftProb = 0.1  # probability that a 1 shifts when adding noise
+bigJumpProb = 0.000000001  # probability of a big jump occurring (around 30)
+bigJumpSize = 30  # size of a big jump
+chunkSize = 100000
+maxDelayVariation = 50  # where the delay can wander
+expectedDelay = 1000
 
-prevDelayVal = random.randint(950, 1050)  # declare and initialize the prevDelayVal
-regularArr = np.random.choice([0, 1], size=100000, p=[0.8, 0.2])  # declaring and initializing delayedArr
-delayedArr = np.zeros(100000, int)  # initializing everything in delay channel to 0
-for i in range(100000):  # loop over everything in the d and for each 1 generate a delay
-    if regularArr[i] == 1:
-        delayChange = random.randint(-maxDelayValChange, maxDelayValChange)
-        if (i + delayChange + prevDelayVal) < 100000:       # if the new index is in bounds, make it 1
-            delayedArr[i + delayChange + prevDelayVal] = 1
-            prevDelayVal = delayChange + prevDelayVal       # update the prevDelayVal
+regularArr = np.random.choice([0, 1], size=chunkSize, p=[0.8, 0.2])  # declaring and initializing regularArr
 
 
-def add_noise(arr):
-    noisyArr = arr.copy()
-    for j in range(100000):
-        if arr[j] == 1:  # if sample is 1
+def generate_delayed_stream():
+    delay_history = []
+    delayedStream = np.zeros(chunkSize, int)  # initializing everything in delay channel to 0
+    currentDelay = float(random.random() * 100 + (expectedDelay - maxDelayVariation))  # generate an initial delay
+
+    for i in range(chunkSize):  # loop over everything in the d and for each 1 generate a delay
+        if regularArr[i] == 1:
+            # random walk - update current delay with small step
+            step = random.uniform(-0.1, 0.1)
+            currentDelay += step
+            # occasionally, add an infrequent big jump
+            if random.random() < bigJumpProb:
+                bigJump = random.uniform(-bigJumpSize, bigJumpSize)
+                currentDelay += bigJump
+
+            # add fixed jitter
+            jitter = 0
+            if random.random() < shiftProb:
+                jitter = random.uniform(-maxJitter, maxJitter)
+
+            roundedFinalDelay = int(round(currentDelay + jitter))
+            roundedFinalDelay = max(expectedDelay - maxDelayVariation,
+                                    roundedFinalDelay)  # make sure delay is in bounds of the max delay
+            roundedFinalDelay = min(expectedDelay + maxDelayVariation, roundedFinalDelay)
+
+            delay_index = i + roundedFinalDelay
+            delay_history.append(roundedFinalDelay)
+
+            # print(roundedFinalDelay)
+            # only updated delay stream if in bounds
+            if 0 <= delay_index < chunkSize:
+                delayedStream[delay_index] = 1
+
+    for j in range(chunkSize):
+        if delayedStream[j] == 1:  # if sample is 1
             if random.random() < noise1to0:  # see if you need to change from 1 to 0
-                noisyArr[j] = 0
-            elif random.random() < shiftProb:  # check if you need to shift the 1 +-2 (max)
-                shift = int(np.random.triangular(-maxShift, 0, maxShift))  # generate the shift amount
-                noisyArr[j] = 0  # remove the sample from current location
-                if 0 <= j + shift < 100000:     # check bounds for shift and shift if in bounds
-                    noisyArr[j + shift] = 1
+                delayedStream[j] = 0
         else:
-            if random.random() < noise0to1:     # if 0, check to see if should switch to 1
-                noisyArr[j] = 1
-    return noisyArr
+            if random.random() < noise0to1:  # if 0, check to see if should switch to 1
+                delayedStream[j] = 1
+    return delayedStream, delay_history
 
 
-delayedArr = add_noise(delayedArr)
+delayedArr, delayHistory = generate_delayed_stream()
+
+plt.figure(figsize=(12, 6))
+plt.plot(delayHistory, label="Delayed")
+plt.xlabel("Sample Index")
+plt.ylabel("Delay Value")
+plt.title("Delay Evolution Over Samples")
+plt.legend()
+plt.show()
 
 with open('regular_input.txt', 'w') as f:  # write to the regular_input.txt file
     for val in regularArr:
