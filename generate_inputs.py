@@ -25,10 +25,10 @@ def generate_delayed_stream():
     currentDelay = float(random.random() * 100 + (expectedDelay - maxDelayVariation))  # generate an initial delay
 
     for i in range(chunkSize):  # loop over everything in the d and for each 1 generate a delay
+        # random walk - update current delay with small step
+        step = random.uniform(-0.1, 0.1)
+        currentDelay += step
         if regularArr[i] == 1:
-            # random walk - update current delay with small step
-            step = random.uniform(-0.1, 0.1)
-            currentDelay += step
             updateDelay = currentDelay
             # occasionally, add an infrequent big jump
             if random.random() < bigJumpProb:
@@ -63,20 +63,23 @@ def generate_delayed_stream():
     return delayedStream, delay_history
 
 
-delayedArr, delayHistory = generate_delayed_stream()
+def generateInputs():
+    delayedArr, delayHistory = generate_delayed_stream()
 
-# plt.figure(figsize=(12, 6))
-# plt.plot(delayHistory, label="Delayed")
-# plt.xlabel("Sample Index")
-# plt.ylabel("Delay Value")
-# plt.title("Delay Evolution Over Samples")
-# plt.legend()
-# plt.show()
+    # for visualizing the actual generated delay
 
-with open('regular_input.txt', 'w') as f:  # write to the regular_input.txt file
-    for val in regularArr:
-        f.write(str(val) + "\n")
+    # plt.figure(figsize=(12, 6))
+    # plt.plot(delayHistory, label="Delayed")
+    # plt.xlabel("Sample Index")
+    # plt.ylabel("Delay Value")
+    # plt.title("Delay Evolution Over Samples")
+    # plt.legend()
+    # plt.show()
 
-with open('delayed_input.txt', 'w') as f:  # write to the delayed_input.txt file
-    for val in delayedArr:
-        f.write(str(val) + "\n")
+    with open('regular_input.txt', 'w') as f:  # write to the regular_input.txt file
+        for val in regularArr:
+            f.write(str(val) + "\n")
+
+    with open('delayed_input.txt', 'w') as f:  # write to the delayed_input.txt file
+        for val in delayedArr:
+            f.write(str(val) + "\n")

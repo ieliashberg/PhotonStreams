@@ -1,158 +1,189 @@
-# import numpy as np
-# import generate_inputs
-# import matplotlib
-#
+import generate_inputs
+import load_stream_module
+import find_coinciding
+# import matplotlib # for visualization if wanted
+import time
+import mmap
+
+
+# also just for visualization purposes
 # matplotlib.use("TkAgg")
 # import matplotlib.pyplot as plt
-#
-# def load_in_streams():
-#     with open('delayed_input.txt', 'r') as f:
-#         dStream = int(''.join(line.strip() for line in f), 2)  # convert to binary
-#
-#     with open('regular_input.txt', 'r') as f:
-#         rStream = int(''.join(line.strip() for line in f), 2)
-#
-#     return dStream, rStream
-#
-#
-# def load_stream(filename):
-#     with open(filename, 'r') as f:
-#         return int(''.join(line.strip() for line in f), 2)
-#
-#
-# if __name__ == '__main__':
-#     generate_inputs
-#     # Load both streams as integers with fixed length
-#     dStream = load_stream('delayed_input.txt')
-#     rStream = load_stream('regular_input.txt')
-#
-#
-#
-#     @profile
-#     def findCoinciding(delayedStream, regularStream):
-#         bestCoincidingCount = 0
-#         bestDelay = 950
-#         # recordedCoinciding = []
-#         for i in range(950, 1051):
-#             tempRegularStream = regularStream >> i
-#
-#             coincidingNum = delayedStream & tempRegularStream # and the two streams
-#             coincidingCount = coincidingNum.bit_count()  # count the number of coinciding 1s
-#             # recordedCoinciding.append(coincidingCount)
-#
-#             if bestCoincidingCount < coincidingCount:  # update bestDelay and bestCoincidingCount if necessary
-#                 bestCoincidingCount = coincidingCount
-#                 bestDelay = i
-#
-#         # plt.figure(figsize=(12, 6))
-#         # plt.plot(recordedCoinciding, label="CoincidingVals")
-#         # plt.xlabel("Offset from 950")
-#         # plt.ylabel("Num Coinciding")
-#         # plt.title("Num Coinciding Over the Offset from 950 to 1050")
-#         # plt.legend()
-#         # plt.show()
-#
-#         surroundingArr = np.zeros(10, int)  # look at surrounding values (+-5)
-#         decreaseBy1 = False
-#         for offset in range(-5, 6):
-#             if offset == 0:  # if it isn't surrounding (just og val) don't include it
-#                 decreaseBy1 = True
-#                 continue
-#
-#             currDelay = offset + bestDelay
-#             tempRegularStream = regularStream >> currDelay
-#             coincidingNum = delayedStream & tempRegularStream
-#             coincidingCount = coincidingNum.bit_count()
-#
-#             if decreaseBy1:
-#                 offset -= 1
-#             surroundingArr[5 + offset] = coincidingCount
-#         return bestDelay, bestCoincidingCount, surroundingArr
-#
-#
-#     optimalDelay, optimalCoinciding, surrounding = findCoinciding(dStream, rStream)
-#     print(optimalDelay)
-#     print(optimalCoinciding)
-#     print(surrounding)
-import numpy as np
-import matplotlib.pyplot as plt
 
 
-# ----------------------------
-# Load the streams as NumPy arrays.
-# ----------------------------
-def load_stream(filename):
-    # Assumes each line contains a single digit (0 or 1); loadtxt reads them as int.
-    return np.loadtxt(filename, dtype=int)
+# Simple python implementation of loading the streams for comparison (not currently used)
+def load_stream(inputFile):
+    with open(inputFile, 'r') as f:
+        # memory map the whole file (length = 0 means the whole file)
+        mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+        # read entire contents from memory map
+        s = mm.read().decode('ascii')
+        # close the map
+        mm.close()
+    # Remove any whitespace characters
+    s = s.replace("\n", "").replace(" ", "")
+
+    # return base 2 integer representation of the input
+    return int(s, 2)
 
 
-# ----------------------------
-# Shifting helper function.
-# For a right shift (which "cuts off" the last d elements and pads d zeros at the start).
-# ----------------------------
-@profile
-def shift_right(arr, d):
-    if d <= 0:
-        # For completeness, if d <= 0 we could instead shift left.
-        return np.concatenate((arr[-d:], np.zeros(-d, dtype=arr.dtype)))
-    # d > 0: shift right — pad with d zeros at beginning, remove d elements at the end.
-    return np.concatenate((np.zeros(d, dtype=arr.dtype), arr[:-d]))
+# calculates correlation, strict python function (not currently used)
+def findCoinciding(delayedStream, regularStream):
+    bestCoincidingCount = 0
+    bestDelay = 950
+    # recordedCoinciding = []       # for visualization
+    for i in range(950, 1051):
+        tempRegularStream = regularStream >> i
+        coincidingNum = delayedStream & tempRegularStream  # and the two streams
+        coincidingCount = coincidingNum.bit_count()  # count the number of coinciding 1s
+        # recordedCoinciding.append(coincidingCount) # for visualization
+        if bestCoincidingCount < coincidingCount:  # update bestDelay and bestCoincidingCount if necessary
+            bestCoincidingCount = coincidingCount
+            bestDelay = i
 
-
-# ----------------------------
-# Main execution
-# ----------------------------
-if __name__ == '__main__':
-    # Load streams from file as vectorized NumPy arrays.
-    delayed_stream = load_stream('delayed_input.txt')
-    regular_stream = load_stream('regular_input.txt')
-
-    # Verify the stream lengths:
-    chunk_size = delayed_stream.size  # should be 100,000
-    print("Stream length:", chunk_size)
-
-    # Define candidate delay values (in samples) to test.
-    delay_min = 950
-    delay_max = 1050
-
-    best_coinciding_count = -1
-    best_delay = None
-    # coincidence_counts = []  # record count per candidate delay
-
-    # Loop over candidate delays:
-    for d in range(delay_min, delay_max + 1):
-        # Vectorized shift: shift the regular stream by 'd' samples to the right.
-        shifted_regular = shift_right(regular_stream, d)
-        # Compute element-wise AND (both arrays contain 0s and 1s, so this returns 1 when both are 1).
-        coinciding = np.bitwise_and(delayed_stream, shifted_regular)
-        # Sum the ones (vectorized)
-        count = int(np.sum(coinciding))
-        coincidence_counts.append(count)
-        if count > best_coinciding_count:
-            best_coinciding_count = count
-            best_delay = d
-
-    print("Optimal delay (samples):", best_delay)
-    print("Optimal coinciding count:", best_coinciding_count)
-
-    # Compute surrounding counts (from best_delay - 5 to best_delay + 5).
-    surrounding_arr = np.zeros(11, dtype=int)  # 11 values for offsets -5 ... +5
-    for offset in range(-5, 6):
-        current_delay = best_delay + offset
-        shifted_regular = shift_right(regular_stream, current_delay)
-        coinciding = np.bitwise_and(delayed_stream, shifted_regular)
-        surrounding_arr[offset + 5] = int(np.sum(coinciding))
-
-    print("Surrounding counts (offsets -5 to +5):")
-    print(surrounding_arr)
-
-    # Plot the candidate delays vs. their coinciding counts.
-    # delays = np.arange(delay_min, delay_max + 1)
-    # plt.figure(figsize=(10, 5))
-    # plt.plot(delays, coincidence_counts, 'o-', label="Coinciding count")
-    # plt.xlabel("Delay (samples)")
-    # plt.ylabel("Coinciding 1's count")
-    # plt.title("Coinciding count vs. Delay")
+    # Visualization of correlation function
+    # plt.figure(figsize=(12, 6))
+    # plt.plot(recordedCoinciding, label="CoincidingVals")
+    # plt.xlabel("Offset from 950")
+    # plt.ylabel("Num Coinciding")
+    # plt.title("Num Coinciding Over the Offset from 950 to 1050")
     # plt.legend()
     # plt.show()
 
+    surroundingArr = [0] * 11
+    for offset in range(-5, 6):
+        currDelay = bestDelay + offset
+        tempRegularStream = regularStream >> currDelay
+        coincidingNum = delayedStream & tempRegularStream
+        coincidingCount = coincidingNum.bit_count()
+        surroundingArr[offset + 5] = coincidingCount
+
+    return bestDelay, bestCoincidingCount, surroundingArr
+
+
+def main():
+    # debug stuff to seeing how fast the IO and the find_coinciding function is
+    totalIOTime = 0
+    totalFuncTime = 0
+
+    iterations = 100
+    for i in range(iterations):
+        generate_inputs.generateInputs()
+
+        startIO = time.time()  # start IO time - strictly for timing
+
+        # Using c module for IO, load in the 2 photon streams
+        dStream = load_stream_module.load_stream('delayed_input.txt')
+        rStream = load_stream_module.load_stream('regular_input.txt')
+
+        # pure python for loading 2 photon streams (only for comparison to c module speed)
+        # dStream = load_stream('delayed_input.txt')
+        # rStream = load_stream('regular_input.txt')
+
+        endIO = time.time()  # ending the IO time
+        totalIOTime += endIO - startIO  # add this IO time to total IO time
+
+        startFunc = time.time()  # timing the find_coinciding function
+
+        # strict python implementation of correlation function (only for comparison to cython speed)
+        # optimalDelay, optimalCoinciding, surrounding = findCoinciding(dStream, rStream)
+
+        # correlation function implementation using cython module
+        optimalDelay, optimalCoinciding, surrounding = find_coinciding.findCoinciding(dStream, rStream)
+
+        # can comment out this section if you don't want to see the output (slows down a lot if you print)
+        # print(optimalDelay)
+        # print(optimalCoinciding)
+        # print(surrounding)
+
+        endFunc = time.time()  # end time for find_Coinciding
+        totalFuncTime += endFunc - startFunc  # add time to total find_coinciding time
+
+    # also here just to check timing (can comment this section out)
+    print("averageIOTime:", totalIOTime / iterations)
+    print("averageFuncTime:", totalFuncTime / iterations)
+    print("average total time:", (totalIOTime / iterations) + (totalFuncTime / iterations))
+    print("total time:", totalIOTime + totalFuncTime)
+
+
+# separate from actual main so it was easier to profile the correlation function (not necessary profiling not needed)
+# We can move all our code to here if necessary
+if __name__ == '__main__':
+    main()
+
+
+# End to end Implementation using multithreading (for some reason turned out to be slower than single threaded implementation)
+# import threading
+# import queue
+# import time
+# import generate_inputs
+# import load_stream_module
+# import find_coinciding
+#
+# # maxsize prevents producer from getting too far ahead of consumer
+# data_queue = queue.Queue(maxsize=10)
+#
+# NUM_ITERATIONS = 1000
+# totalTimeForConsumer = 0.0
+# totalTimeForProducer = 0.0
+#
+#
+# # thread that reads input files and puts them on the queue
+# def producer():
+#     global totalTimeForProducer
+#     startProducer = time.time()
+#     for _ in range(NUM_ITERATIONS):
+#
+#         generate_inputs.generateInputs()
+#
+#         # load streams using c module
+#         dStream = load_stream_module.load_stream('delayed_input.txt')
+#         rStream = load_stream_module.load_stream('regular_input.txt')
+#
+#         # put streams into queue
+#         data_queue.put((dStream, rStream))
+#     # signal completion to consumer
+#     data_queue.put(None)
+#     endProducer = time.time()
+#     totalTimeForProducer = endProducer - startProducer
+#
+#
+# # thread that processes data from the queue.
+# def consumer():
+#     global totalTimeForConsumer
+#     startConsumer = time.time()
+#     iteration = 0
+#     while True:
+#         item = data_queue.get()
+#         if item is None:
+#             data_queue.task_done()  # mark  sentinel as done
+#             break
+#         dStream, rStream = item
+#
+#         bestDelay, bestCoinciding, surrounding = find_coinciding.findCoinciding(dStream, rStream)
+#
+#         print(
+#             f"Iteration {iteration}: Optimal delay: {bestDelay}, Coinciding: {bestCoinciding}, Surrounding: {surrounding}")
+#         iteration += 1
+#
+#         data_queue.task_done()
+#     endConsumer = time.time()
+#     totalTimeForConsumer = endConsumer - startConsumer
+#
+#
+# # create and start threads
+# producer_thread = threading.Thread(target=producer, name="Producer", daemon=True)
+# consumer_thread = threading.Thread(target=consumer, name="Consumer", daemon=True)
+#
+# start_time = time.time()
+# producer_thread.start()
+# consumer_thread.start()
+#
+# # wait till both threads finish
+# producer_thread.join()
+# consumer_thread.join()
+# end_time = time.time()
+#
+# print("Total producer time:", totalTimeForProducer, "seconds")
+# print("Total consumer time:", totalTimeForConsumer, "seconds")
+# print("Total processing time:", end_time - start_time, "seconds")
