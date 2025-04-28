@@ -4,11 +4,20 @@ import find_coinciding
 # import matplotlib # for visualization if wanted
 import time
 import mmap
-
+import threading
+import queue
 
 # also just for visualization purposes
 # matplotlib.use("TkAgg")
 # import matplotlib.pyplot as plt
+
+# The below section is only for multithreading solution
+# maxsize prevents producer from getting too far ahead of consumer
+data_queue = queue.Queue(maxsize=10)
+
+NUM_ITERATIONS = 1000
+totalTimeForConsumer = 0.0
+totalTimeForProducer = 0.0
 
 
 # Simple python implementation of loading the streams for comparison (not currently used)
@@ -61,13 +70,12 @@ def findCoinciding(delayedStream, regularStream):
     return bestDelay, bestCoincidingCount, surroundingArr
 
 
-def main():
+def mainSingleThread():
     # debug stuff to seeing how fast the IO and the find_coinciding function is
     totalIOTime = 0
     totalFuncTime = 0
 
-    iterations = 100
-    for i in range(iterations):
+    for i in range(NUM_ITERATIONS):
         generate_inputs.generateInputs()
 
         startIO = time.time()  # start IO time - strictly for timing
@@ -100,90 +108,77 @@ def main():
         totalFuncTime += endFunc - startFunc  # add time to total find_coinciding time
 
     # also here just to check timing (can comment this section out)
-    print("averageIOTime:", totalIOTime / iterations)
-    print("averageFuncTime:", totalFuncTime / iterations)
-    print("average total time:", (totalIOTime / iterations) + (totalFuncTime / iterations))
+    print("averageIOTime:", totalIOTime / NUM_ITERATIONS)
+    print("averageFuncTime:", totalFuncTime / NUM_ITERATIONS)
+    print("average total time:", (totalIOTime / NUM_ITERATIONS) + (totalFuncTime / NUM_ITERATIONS))
     print("total time:", totalIOTime + totalFuncTime)
 
 
-# separate from actual main so it was easier to profile the correlation function (not necessary profiling not needed)
+# End to end Implementation using multithreading (for some reason turned out to be slower than single threaded implementation)
+
+
+# thread that reads input files and puts them on the queue
+def producer():
+    global totalTimeForProducer
+    startProducer = time.time()
+    for _ in range(NUM_ITERATIONS):
+        generate_inputs.generateInputs()
+
+        # load streams using c module
+        dStream = load_stream_module.load_stream('delayed_input.txt')
+        rStream = load_stream_module.load_stream('regular_input.txt')
+
+        # put streams into queue
+        data_queue.put((dStream, rStream))
+    # signal completion to consumer
+    data_queue.put(None)
+    endProducer = time.time()
+    totalTimeForProducer = endProducer - startProducer
+
+
+# thread that processes data from the queue.
+def consumer():
+    global totalTimeForConsumer
+    startConsumer = time.time()
+    iteration = 0
+    while True:
+        item = data_queue.get()
+        if item is None:
+            data_queue.task_done()  # mark  sentinel as done
+            break
+        dStream, rStream = item
+
+        bestDelay, bestCoinciding, surrounding = find_coinciding.findCoinciding(dStream, rStream)
+
+        print(
+            f"Iteration {iteration}: Optimal delay: {bestDelay}, Coinciding: {bestCoinciding}, Surrounding: {surrounding}")
+        iteration += 1
+
+        data_queue.task_done()
+    endConsumer = time.time()
+    totalTimeForConsumer = endConsumer - startConsumer
+
+
+def mainMultiThread():
+    # create and start threads
+    producer_thread = threading.Thread(target=producer, name="Producer", daemon=True)
+    consumer_thread = threading.Thread(target=consumer, name="Consumer", daemon=True)
+
+    start_time = time.time()
+    producer_thread.start()
+    consumer_thread.start()
+
+    # wait till both threads finish
+    producer_thread.join()
+    consumer_thread.join()
+    end_time = time.time()
+
+    print("Total producer time:", totalTimeForProducer, "seconds")
+    print("Total consumer time:", totalTimeForConsumer, "seconds")
+    print("Total processing time:", end_time - start_time, "seconds")
+
+# separate from actual main so it was easier to profile the correlation function and also split up the multithread and singlethread implementations (not necessary if profiling not needed)
 # We can move all our code to here if necessary
 if __name__ == '__main__':
-    main()
-
-
-# End to end Implementation using multithreading (for some reason turned out to be slower than single threaded implementation)
-# import threading
-# import queue
-# import time
-# import generate_inputs
-# import load_stream_module
-# import find_coinciding
-#
-# # maxsize prevents producer from getting too far ahead of consumer
-# data_queue = queue.Queue(maxsize=10)
-#
-# NUM_ITERATIONS = 1000
-# totalTimeForConsumer = 0.0
-# totalTimeForProducer = 0.0
-#
-#
-# # thread that reads input files and puts them on the queue
-# def producer():
-#     global totalTimeForProducer
-#     startProducer = time.time()
-#     for _ in range(NUM_ITERATIONS):
-#
-#         generate_inputs.generateInputs()
-#
-#         # load streams using c module
-#         dStream = load_stream_module.load_stream('delayed_input.txt')
-#         rStream = load_stream_module.load_stream('regular_input.txt')
-#
-#         # put streams into queue
-#         data_queue.put((dStream, rStream))
-#     # signal completion to consumer
-#     data_queue.put(None)
-#     endProducer = time.time()
-#     totalTimeForProducer = endProducer - startProducer
-#
-#
-# # thread that processes data from the queue.
-# def consumer():
-#     global totalTimeForConsumer
-#     startConsumer = time.time()
-#     iteration = 0
-#     while True:
-#         item = data_queue.get()
-#         if item is None:
-#             data_queue.task_done()  # mark  sentinel as done
-#             break
-#         dStream, rStream = item
-#
-#         bestDelay, bestCoinciding, surrounding = find_coinciding.findCoinciding(dStream, rStream)
-#
-#         print(
-#             f"Iteration {iteration}: Optimal delay: {bestDelay}, Coinciding: {bestCoinciding}, Surrounding: {surrounding}")
-#         iteration += 1
-#
-#         data_queue.task_done()
-#     endConsumer = time.time()
-#     totalTimeForConsumer = endConsumer - startConsumer
-#
-#
-# # create and start threads
-# producer_thread = threading.Thread(target=producer, name="Producer", daemon=True)
-# consumer_thread = threading.Thread(target=consumer, name="Consumer", daemon=True)
-#
-# start_time = time.time()
-# producer_thread.start()
-# consumer_thread.start()
-#
-# # wait till both threads finish
-# producer_thread.join()
-# consumer_thread.join()
-# end_time = time.time()
-#
-# print("Total producer time:", totalTimeForProducer, "seconds")
-# print("Total consumer time:", totalTimeForConsumer, "seconds")
-# print("Total processing time:", end_time - start_time, "seconds")
+    mainSingleThread()
+    # mainMultiThread()
